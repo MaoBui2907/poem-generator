@@ -19,6 +19,6 @@ class PoemDataset(Dataset):
         ctr = torch.FloatTensor(self.ctr[index])
         out = torch.FloatTensor(self.out[index])
 
-        sample =(inp, ctr, out)
+        sample = (inp, ctr, out)
 
         return sample

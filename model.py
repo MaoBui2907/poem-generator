@@ -1,3 +1,5 @@
+import json
+from turtle import forward
 import torch
 from torch import nn
 from poem_dataset import PoemDataset
@@ -15,44 +17,48 @@ class Encoder(nn.Module):
     def forward(self, inp):
         out, hid = self.BiLSTM(inp)
         out = self.Linear(out)
-        out = torch.tanh(out)
+        out = torch.sigmoid(out)
         return out, hid
 
+
+class Attention(nn.Module):
+    def __init__(self, inp_size, hid_size) -> None:
+        super(Attention, self).__init__()
+        self.BiLSTM = nn.LSTM(inp_size, hid_size, num_layers=3, bidirection=True)
+    
+    def forward(self, inp):
+        out, (hid, cel) = self.BiLSTM(inp)
 
 class Decoder(nn.Module):
     def __init__(self, inp_size, hid_size, window_size, word_size):
         super(Decoder, self).__init__()
-        self.window_size = window_size
-        self.GRU = nn.GRU(inp_size, hid_size, num_layers=3, batch_first=True)
-        self.Linear = nn.Linear(hid_size, 1)
-        self.Combiner = nn.Linear(window_size, word_size)
+        self.inp_size = inp_size
+        self.GRU = nn.GRU(inp_size, hid_size, num_layers=1, batch_first=True)
+        self.Linear = nn.Linear(hid_size, word_size)
 
     def forward(self, inp):
-        out, hid = self.GRU(inp)
-        _out = out.reshape(-1, out.size(2))
+        inp = inp.reshape(-1, self.inp_size)
+        _out, hid = self.GRU(inp)
         _out = self.Linear(_out)
-        _out = _out.reshape(-1, self.window_size)
-        _out = self.Combiner(_out)
         out = torch.sigmoid(_out)
         return out
 
 class PoemGeneratorModel(nn.Module):
-    def __init__(self, word_size, embed_size, hid_size) -> None:
+    def __init__(self, word_size, embed_size, hid_size, window_size) -> None:
         super().__init__()
         self.Encoder = Encoder(embed_size, hid_size)
         self.sentiment = nn.Linear(embed_size, hid_size)
         self.scale = nn.Linear(hid_size * 2, hid_size)
-        self.Decoder = Decoder(hid_size, hid_size, 10, word_size)
+        self.Decoder = Decoder(embed_size, hid_size, window_size, word_size)
     
     def forward(self, input, sen):
-        out, hid = self.Encoder(input)
-        out = self.Decoder(out)
+        out = self.Decoder(input)
         return out
 
 class PoemGeneratorLightning(pl.LightningModule):
-    def __init__(self, word_size, embed_size, hid_size, seq_len, batch_size=32, lr=0.0001, *args, **kwargs):
+    def __init__(self, word_size, embed_size, hid_size, window_size, seq_len, batch_size=32, lr=0.0001, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = PoemGeneratorModel(word_size, embed_size, hid_size)
+        self.model = PoemGeneratorModel(word_size, embed_size, hid_size, window_size)
         self.word_size = word_size
         self.seq_len = seq_len
         self.embed_size = embed_size
@@ -65,7 +71,7 @@ class PoemGeneratorLightning(pl.LightningModule):
 
     def setup(self, stage: str):
         inp_ = "/data/vectorized/inp.pkl"
-        ctr_ = "/data/vectorized/sen.pkl"
+        ctr_ = "/data/vectorized/inp.pkl"
         out_ = "/data/vectorized/out.pkl"
         dataset = PoemDataset(inp_, ctr_, out_)
         train_size = int(0.8 * len(dataset))
@@ -85,6 +91,13 @@ class PoemGeneratorLightning(pl.LightningModule):
         inp, att, out = batch
         predict = self(inp, att)
         loss = F.cross_entropy(predict, out)
+        with open('./tmp/inp.json', 'w') as f:
+            json.dump({
+                "inp": inp.size(),
+                "pre": predict.size(),
+                "out": out.size(),
+                "loss": loss.tolist()
+            }, f)
         return loss
 
     def validation_step(self, batch, batch_idx):

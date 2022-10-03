@@ -3,18 +3,23 @@ name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
 
+[[source]]
+url = "https://download.pytorch.org/whl/cu116"
+verify_ssl = true
+name = "downloadpytorch"
+
 [dev-packages]
 autopep8 = "*"
 
 [packages]
 numpy = "*"
 tqdm = "*"
-torch = "*"
 pytorch-lightning = "*"
 torchvision = "*"
 fasttext = "*"
 fsspec = "*"
 flask = "*"
+torch = {version = "*", index = "downloadpytorch"}
 
 [requires]
 python_version = "3.8"

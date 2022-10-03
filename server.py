@@ -8,22 +8,27 @@ from flask import Flask, make_response, request, jsonify
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--config", default="/config.ini")
-parser.add_argument("--chkp", default="lightning_logs/version_0/checkpoints/last.ckpt")
+parser.add_argument("--config", default="/data/vectorized/config.ini")
+parser.add_argument("--chkp", default="lightning_logs/version_5/checkpoints/epoch=99-step=4100.ckpt")
 
 args = parser.parse_args()
 
 config = data_utils.load_config(args.config)
 
-embed_size = config.getint('DEFAULT', 'emb_size')
-word_size = config.getint('DEFAULT', 'word_size')
-hid_size = config.getint('DEFAULT', 'hid_size')
+embed_size = config.getint('DEFAULT', 'WORD_SIZE') + 1
+word_size = config.getint('DEFAULT', 'bow_size')
+hid_size = 200
 seq_len = config.getint('DEFAULT', 'seq_len')
+window_size = config.getint('DEFAULT', 'window_size')
 
 chkp_path = args.chkp
 
-nlp = vnlp.VNlp('model/wiki.vi.bin')
-corpus = data_utils.unpickle_file("/data/vectorized/word_list.pkl")
+nlp = vnlp.VNlp('data/raws/wiki.vi.bin', embed_size - 1)
+corpus = data_utils.unpickle_file("/data/vectorized/dict.pkl")
+
+model = PoemGeneratorLightning.load_from_checkpoint(chkp_path, strict=True, word_size=word_size, embed_size=embed_size, hid_size=hid_size, window_size=window_size, seq_len=seq_len)
+model.eval()
+model.freeze()
 
 app = Flask(__name__)
 
@@ -35,22 +40,19 @@ def index():
 def predict():
     data = request.get_json()
     print(data)
-    inp_ = torch.FloatTensor(corpus.vectors[corpus.word2idx["<SOS>"]])
+    inp_ = torch.FloatTensor(nlp.to_vector(data.get('start_text')))
     inp_ = inp_.reshape(1, 1, -1)
 
     sentiments = data.get("keywords")
     sent = torch.FloatTensor(nlp.combined_vector(sentiments))
     sent = sent.reshape(1, -1)
 
-    model = PoemGeneratorLightning.load_from_checkpoint(chkp_path, strict=True, word_size=word_size, embed_size=embed_size, hid_size=hid_size, seq_len=seq_len)
-    model.eval()
-    model.freeze()
-
     outputs = []
     for i in range(seq_len):
         out = model(inp_, sent)
         out_ = out.squeeze().exp()
         out_ = torch.multinomial(out_, 1)[0]
+        # out_ = torch.argmax(out_)
         tok = corpus.idx2word[int(out_)]
         outputs.append(tok)
         inp_ = torch.FloatTensor(corpus.vectors[int(out_)])

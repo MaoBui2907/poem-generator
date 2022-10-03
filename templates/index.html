@@ -34,6 +34,16 @@
             data-role="tagsinput"
           />
         </div>
+        <div class="form-group">
+          <input
+            type="text"
+            class="form-control"
+            name="start_text"
+            id="start_text"
+            aria-describedby="keyword"
+            placeholder="start"
+          />
+        </div>
         <div class="form-check">
           <label class="form-check-label">
             <input
@@ -65,12 +75,14 @@
     <script src="{{ url_for('static',filename='tagsinput.js') }}"></script>
     <script>
       function generate() {
-        var keywords = $('#keyword_text').val().split(',')
+        var keywords = $('#keyword_text').val().split(',');
+        var start_text = $('#start_text').val().trim();
         $.ajax({
           type: "POST",
           url: "/predict",
           data: JSON.stringify({
             'keywords': keywords,
+            'start_text': start_text,
           }),
           dataType: "json",
           contentType: "application/json; charset=utf-8",

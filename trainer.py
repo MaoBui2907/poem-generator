@@ -14,9 +14,9 @@ parser.add_argument("--dev", action="store_true")
 parser.add_argument("--overfit", action="store_true")
 parser.add_argument("--fixed", action="store_true")
 parser.add_argument("--gpu", type=int, default=0)
-parser.add_argument("--batch", type=int, default=10)
+parser.add_argument("--batch", type=int, default=1000)
 parser.add_argument("--epoch", type=int, default=100)
-parser.add_argument("--lr", type=float, default=0.1)
+parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--config", type=str, default="/data/vectorized/config.ini")
 parser.add_argument("--resume", type=str, default="")
 
@@ -24,8 +24,9 @@ args = parser.parse_args()
 
 config = data_utils.load_config(args.config)
 
-embed_size = 301
+embed_size = config.getint('DEFAULT', 'WORD_SIZE') + 1
 word_size = config.getint('DEFAULT', 'BOW_SIZE')
+window_size = 1
 hid_size = 200
 seq_len = config.getint('DEFAULT', 'SEQ_LEN')
 
@@ -39,14 +40,14 @@ if args.overfit:
         logging.info('Loading state')
         model = PoemGeneratorLightning.load_from_checkpoint(args.resume, strict=True, word_size=word_size, embed_size=embed_size, hid_size=hid_size, seq_len=seq_len, batch_size=1, lr=args.lr)
     else:
-        model = PoemGeneratorLightning(word_size, embed_size, hid_size, seq_len, lr=args.lr, batch_size=1)
-    trainer = pl.Trainer(gpus=args.gpu, overfit_batches=1, max_epochs=args.epoch, checkpoint_callback=checkpoint_callback)
+        model = PoemGeneratorLightning(word_size, embed_size, hid_size, window_size, seq_len, lr=args.lr, batch_size=1)
+    trainer = pl.Trainer(gpus=args.gpu, overfit_batches=1, max_epochs=args.epoch, accelerator='gpu')
     trainer.fit(model)
 else:
     if args.resume != "":
         logging.info('Loading state')
         model = PoemGeneratorLightning.load_from_checkpoint(args.resume, strict=True, word_size=word_size, embed_size=embed_size, hid_size=hid_size, seq_len=seq_len, lr=args.lr, batch_size=args.batch)
     else:
-        model = PoemGeneratorLightning(word_size, embed_size, hid_size, seq_len, lr=args.lr, batch_size=args.batch)
-    trainer = pl.Trainer(fast_dev_run=args.dev, max_epochs=args.epoch)
+        model = PoemGeneratorLightning(word_size, embed_size, hid_size, window_size, seq_len, lr=args.lr, batch_size=args.batch)
+    trainer = pl.Trainer(fast_dev_run=args.dev, max_epochs=args.epoch, accelerator='gpu')
     trainer.fit(model)

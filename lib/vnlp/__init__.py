@@ -1,17 +1,19 @@
 import numpy as np
 import fasttext
+import fasttext.util
 
 class VNlp:
-    def __init__(self, model):
+    def __init__(self, model, dim=300):
         self.ft = fasttext.load_model(model)
-        self.word_dimension = self.ft.get_dimension()
+        fasttext.util.reduce_model(self.ft, dim)
+        self.word_dimension = dim
 
     def to_vector(self, word: str):
         control_toks = {
-            "<SOS>": np.asfarray([0]*300 + [1]),
-            "<EOS>": np.asfarray([0]*300 + [2]),
-            "<PAD>": np.asfarray([0]*300 + [3]),
-            "<BRK>": np.asfarray([0]*300 + [4]),
+            "<SOS>": np.asfarray([0]*self.word_dimension + [1]),
+            "<EOS>": np.asfarray([0]*self.word_dimension + [2]),
+            "<PAD>": np.asfarray([0]*self.word_dimension + [3]),
+            "<BRK>": np.asfarray([0]*self.word_dimension + [4]),
         }
         word = self.normalize(word)
         if word in control_toks.keys():
