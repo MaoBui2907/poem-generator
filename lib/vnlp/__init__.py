@@ -10,16 +10,16 @@ class VNlp:
 
     def to_vector(self, word: str):
         control_toks = {
-            "<SOS>": np.asfarray([0]*self.word_dimension + [1]),
-            "<EOS>": np.asfarray([0]*self.word_dimension + [2]),
-            "<PAD>": np.asfarray([0]*self.word_dimension + [3]),
-            "<BRK>": np.asfarray([0]*self.word_dimension + [4]),
+            "<SOS>": np.asfarray([0]*self.word_dimension),
+            "<EOS>": np.asfarray([0]*self.word_dimension),
+            "<PAD>": np.asfarray([0]*self.word_dimension),
+            "<BRK>": np.asfarray([0]*self.word_dimension),
         }
         word = self.normalize(word)
         if word in control_toks.keys():
             return control_toks[word]
         else:
-            return np.append(self.ft.get_word_vector(word), 0.)
+            return self.ft.get_word_vector(word)
 
     @staticmethod
     def normalize(word: str):

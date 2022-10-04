@@ -10,6 +10,7 @@ name = "downloadpytorch"
 
 [dev-packages]
 autopep8 = "*"
+torch-tb-profiler = "*"
 
 [packages]
 numpy = "*"

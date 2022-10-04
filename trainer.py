@@ -14,8 +14,8 @@ parser.add_argument("--dev", action="store_true")
 parser.add_argument("--overfit", action="store_true")
 parser.add_argument("--fixed", action="store_true")
 parser.add_argument("--gpu", type=int, default=0)
-parser.add_argument("--batch", type=int, default=1000)
-parser.add_argument("--epoch", type=int, default=100)
+parser.add_argument("--batch", type=int, default=32)
+parser.add_argument("--epoch", type=int, default=10)
 parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--config", type=str, default="/data/vectorized/config.ini")
 parser.add_argument("--resume", type=str, default="")
@@ -26,8 +26,8 @@ config = data_utils.load_config(args.config)
 
 embed_size = config.getint('DEFAULT', 'WORD_SIZE') + 1
 word_size = config.getint('DEFAULT', 'BOW_SIZE')
-window_size = 1
-hid_size = 200
+window_size = config.getint('DEFAULT', 'WINDOW_SIZE')
+hid_size = 500
 seq_len = config.getint('DEFAULT', 'SEQ_LEN')
 
 checkpoint_callback = ModelCheckpoint(filename='{epoch}-{step}.ckpt', save_last=True)

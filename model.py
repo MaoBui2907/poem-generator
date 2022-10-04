@@ -6,7 +6,7 @@ from poem_dataset import PoemDataset
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, random_split
 import torch.nn.functional as F
-from torch.optim.adam import Adam
+from torch.optim import adam, sgd
 
 class Encoder(nn.Module):
     def __init__(self, inp_size, hid_size):
@@ -33,12 +33,19 @@ class Decoder(nn.Module):
     def __init__(self, inp_size, hid_size, window_size, word_size):
         super(Decoder, self).__init__()
         self.inp_size = inp_size
-        self.GRU = nn.GRU(inp_size, hid_size, num_layers=1, batch_first=True)
-        self.Linear = nn.Linear(hid_size, word_size)
+        self.hid_size = hid_size
+        self.window_size = window_size
+        self.BiLSTM = nn.LSTM(inp_size, hid_size, num_layers=2, bidirectional=True, batch_first=True, dropout=0.2)
+        self.Combiner = nn.Linear(window_size, 1)
+        self.Linear = nn.Linear(hid_size * 2, word_size)
 
     def forward(self, inp):
         inp = inp.reshape(-1, self.inp_size)
-        _out, hid = self.GRU(inp)
+        _out, (hid, cell) = self.BiLSTM(inp)
+        _out = _out.reshape(-1, self.hid_size * 2, self.window_size)
+        _out = self.Combiner(_out)
+        out = torch.tanh(_out)
+        _out = _out.reshape(-1, self.hid_size * 2)
         _out = self.Linear(_out)
         out = torch.sigmoid(_out)
         return out
@@ -85,12 +92,12 @@ class PoemGeneratorLightning(pl.LightningModule):
         return DataLoader(self.val_set, batch_size=self.batch_size)
 
     def configure_optimizers(self):
-        return Adam(self.parameters(), lr=self.lr)
+        return sgd.SGD(self.parameters(), lr=self.lr)
     
     def training_step(self, batch, batch_idx):
         inp, att, out = batch
         predict = self(inp, att)
-        loss = F.cross_entropy(predict, out)
+        loss = F.mse_loss(predict, out)
         with open('./tmp/inp.json', 'w') as f:
             json.dump({
                 "inp": inp.size(),

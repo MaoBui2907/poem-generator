@@ -9,7 +9,7 @@ from flask import Flask, make_response, request, jsonify
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--config", default="/data/vectorized/config.ini")
-parser.add_argument("--chkp", default="lightning_logs/version_5/checkpoints/epoch=99-step=4100.ckpt")
+parser.add_argument("--chkp", default="lightning_logs/version_9/checkpoints/epoch=4-step=6270.ckpt")
 
 args = parser.parse_args()
 
@@ -17,7 +17,7 @@ config = data_utils.load_config(args.config)
 
 embed_size = config.getint('DEFAULT', 'WORD_SIZE') + 1
 word_size = config.getint('DEFAULT', 'bow_size')
-hid_size = 200
+hid_size = 500
 seq_len = config.getint('DEFAULT', 'seq_len')
 window_size = config.getint('DEFAULT', 'window_size')
 
@@ -40,8 +40,9 @@ def index():
 def predict():
     data = request.get_json()
     print(data)
+    inp_ = [corpus.vectors[corpus.word2idx(i)] for i in ([data_utils.SPECIAL_CONTROLS[2]] * (window_size - 2) + [data_utils.SPECIAL_CONTROLS[0]])] + torch.FloatTensor(nlp.to_vector(data.get('start_text')) + [0.1])
     inp_ = torch.FloatTensor(nlp.to_vector(data.get('start_text')))
-    inp_ = inp_.reshape(1, 1, -1)
+    inp_ = inp_.reshape(1, window_size, -1)
 
     sentiments = data.get("keywords")
     sent = torch.FloatTensor(nlp.combined_vector(sentiments))
@@ -51,12 +52,13 @@ def predict():
     for i in range(seq_len):
         out = model(inp_, sent)
         out_ = out.squeeze().exp()
-        out_ = torch.multinomial(out_, 1)[0]
-        # out_ = torch.argmax(out_)
+        # out_ = torch.multinomial(out_, 1)[0]
+        out_ = torch.argmax(out_)
         tok = corpus.idx2word[int(out_)]
         outputs.append(tok)
-        inp_ = torch.FloatTensor(corpus.vectors[int(out_)])
-        inp_ = inp_.reshape(1, 1, -1)
+        inp_ = inp_.shape(window_size, -1)
+        inp_ = inp_[1:] + [torch.FloatTensor(corpus.vectors[int(out_)])]
+        inp_ = inp_.reshape(1, window_size, -1)
     print(len(outputs))
     print(" ".join(outputs))
     return make_response(jsonify({'result': ' '.join(outputs)}), 200)
