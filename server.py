@@ -1,15 +1,15 @@
 from flask.templating import render_template
 import torch
 import argparse
+import numpy as np
 from lib import data_utils, vnlp
-from lib.dictionary import Dictionary
 from model import PoemGeneratorLightning
 from flask import Flask, make_response, request, jsonify
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--config", default="/data/vectorized/config.ini")
-parser.add_argument("--chkp", default="lightning_logs/version_9/checkpoints/epoch=4-step=6270.ckpt")
+parser.add_argument("--chkp", default="lightning_logs/version_10/checkpoints/epoch=1-step=2508.ckpt")
 
 args = parser.parse_args()
 
@@ -40,8 +40,8 @@ def index():
 def predict():
     data = request.get_json()
     print(data)
-    inp_ = [corpus.vectors[corpus.word2idx(i)] for i in ([data_utils.SPECIAL_CONTROLS[2]] * (window_size - 2) + [data_utils.SPECIAL_CONTROLS[0]])] + torch.FloatTensor(nlp.to_vector(data.get('start_text')) + [0.1])
-    inp_ = torch.FloatTensor(nlp.to_vector(data.get('start_text')))
+    inp_ = np.concatenate([[corpus.vectors[corpus.word2idx[i]] for i in ([data_utils.SPECIAL_CONTROLS[2]] * (window_size - 2) + [data_utils.SPECIAL_CONTROLS[0]])], [np.append(nlp.to_vector(data.get('start_text')), 0.1)]])
+    inp_ = torch.FloatTensor(inp_)
     inp_ = inp_.reshape(1, window_size, -1)
 
     sentiments = data.get("keywords")
@@ -52,12 +52,12 @@ def predict():
     for i in range(seq_len):
         out = model(inp_, sent)
         out_ = out.squeeze().exp()
-        # out_ = torch.multinomial(out_, 1)[0]
-        out_ = torch.argmax(out_)
+        out_ = torch.multinomial(out_, 1)[0]
+        # out_ = torch.argmax(out_)
         tok = corpus.idx2word[int(out_)]
         outputs.append(tok)
-        inp_ = inp_.shape(window_size, -1)
-        inp_ = inp_[1:] + [torch.FloatTensor(corpus.vectors[int(out_)])]
+        inp_ = inp_.reshape(window_size, -1)
+        inp_ = torch.FloatTensor(torch.cat([inp_[1:], torch.FloatTensor([corpus.vectors[int(out_)]])]))
         inp_ = inp_.reshape(1, window_size, -1)
     print(len(outputs))
     print(" ".join(outputs))
